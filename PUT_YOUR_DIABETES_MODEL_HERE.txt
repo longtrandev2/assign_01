@@ -1,0 +1,1 @@
+Copy your trained diabetes_model.joblib from the Assignment 01 notebook into this folder, next to app.py. Do not use a fake/empty model file.

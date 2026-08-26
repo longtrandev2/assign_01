@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prediction Web - Assignment 01</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --ink: #1e293b;
+            --muted: #64748b;
+            --surface: #ffffff;
+            --line: #d6deeb;
+            --result-bg: #effcf7;
+            --result-line: #86efac;
+            --danger-bg: #fff1f2;
+            --danger-line: #fda4af;
+            --container-max: 980px;
+            --accent: #0f766e;
+            --accent-2: #14b8a6;
+            --hero-a: #e2f7f4;
+            --hero-b: #eff6ff;
+        }
+
+        body.mode-diabetes {
+            --accent: #1d4ed8;
+            --accent-2: #60a5fa;
+            --hero-a: #dbeafe;
+            --hero-b: #e0f2fe;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
+            background:
+                radial-gradient(circle at 12% 5%, var(--hero-b) 0%, transparent 36%),
+                radial-gradient(circle at 90% 92%, var(--hero-a) 0%, transparent 40%),
+                #f8fafc;
+            color: var(--ink);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: min(var(--container-max), 92%);
+            margin: 30px auto;
+            background: var(--surface);
+            padding: 24px;
+            border-radius: 22px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, .09);
+            overflow: hidden;
+        }
+
+        .hero {
+            padding: 22px;
+            border-radius: 16px;
+            background: linear-gradient(140deg, var(--hero-a), var(--hero-b));
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0 0 8px;
+            font-size: clamp(1.55rem, 3.8vw, 2.35rem);
+            letter-spacing: .2px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--muted);
+            margin-bottom: 4px;
+            font-size: clamp(.92rem, 2.7vw, 1rem);
+        }
+
+        .chips {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            background: rgba(255, 255, 255, 0.7);
+            color: #334155;
+            border: 1px solid rgba(100, 116, 139, 0.25);
+            border-radius: 999px;
+            font-size: 12px;
+            padding: 6px 11px;
+            font-weight: 600;
+        }
+
+        .mode-switch {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 6px;
+        }
+
+        .mode-link {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            font-weight: 700;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            color: #334155;
+            background: transparent;
+            transition: all .18s ease;
+        }
+
+        .mode-link:hover {
+            border-color: #cbd5e1;
+            background: #f1f5f9;
+        }
+
+        .mode-link.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 8px 20px rgba(15, 118, 110, .25);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .group { margin-bottom: 0; }
+
+        label {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 7px;
+            font-size: .92rem;
+            color: #334155;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            font-size: 15px;
+            background: #fff;
+            transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-2);
+            box-shadow: 0 0 0 4px rgba(20, 184, 166, .13);
+            transform: translateY(-1px);
+        }
+
+        button {
+            width: 100%;
+            margin-top: 16px;
+            padding: 13px;
+            border: 0;
+            border-radius: 12px;
+            background: linear-gradient(120deg, var(--accent), var(--accent-2));
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: .3px;
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 18px rgba(14, 116, 144, .26);
+        }
+
+        .result {
+            margin-top: 24px;
+            padding: 18px;
+            border-radius: 14px;
+            background: var(--result-bg);
+            text-align: center;
+            border: 1px solid var(--result-line);
+        }
+
+        .result h2 {
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+
+        .result .price {
+            font-size: clamp(1.4rem, 4vw, 2rem);
+            font-weight: 800;
+            color: #065f46;
+        }
+
+        .error {
+            margin-top: 20px;
+            padding: 12px;
+            border-radius: 10px;
+            background: var(--danger-bg);
+            color: #881337;
+            word-break: break-word;
+            border: 1px solid var(--danger-line);
+        }
+
+        .note {
+            margin-top: 22px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .hint {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        @media (max-width: 720px) {
+            .container {
+                width: 94%;
+                margin: 20px auto;
+                padding: 16px 14px;
+                border-radius: 12px;
+            }
+
+            .hero {
+                padding: 16px 14px;
+            }
+
+            .subtitle { margin-bottom: 6px; }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .mode-switch {
+                flex-direction: column;
+            }
+
+            input, select, button {
+                min-height: 44px;
+                font-size: 16px;
+            }
+
+            .result, .error { padding: 14px; }
+        }
+    </style>
+</head>
+<body class="mode-{{ mode }}">
+<div class="container">
+    <div class="hero">
+        <h1>{{ mode_info.title }}</h1>
+        <div class="subtitle">{{ mode_info.subtitle }}</div>
+        <div class="chips">
+            <span class="chip">Assignment 01</span>
+            <span class="chip">ML + UI + Application</span>
+            <span class="chip">Responsive</span>
+        </div>
+    </div>
+
+    <div class="mode-switch">
+        <a class="mode-link {% if mode == 'house' %}active{% endif %}" href="/?mode=house">Bài 1: Giá Nhà</a>
+        <a class="mode-link {% if mode == 'diabetes' %}active{% endif %}" href="/?mode=diabetes">Bài 2: Tiểu Đường</a>
+    </div>
+
+    <form method="POST">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <div class="form-grid">
+            {% for field in fields %}
+            <div class="group">
+                <label>{{ field.label }}</label>
+                {% if field.type == 'number' %}
+                <input
+                    type="number"
+                    name="{{ field.name }}"
+                    min="{{ field.min|default('0') }}"
+                    step="{{ field.step|default('0.1') }}"
+                    required
+                    value="{{ form_values.get(field.name, '') }}"
+                    placeholder="{{ field.placeholder|default('Nhập giá trị') }}"
+                >
+                {% else %}
+                <select name="{{ field.name }}" required>
+                    <option value="">-- Chọn --</option>
+                    {% for option in field.options %}
+                    <option value="{{ option }}" {% if form_values.get(field.name) == option %}selected{% endif %}>
+                        {{ field.option_labels[option] if field.option_labels is defined and option in field.option_labels else option }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <button type="submit">{{ mode_info.button }}</button>
+        <div class="hint">{{ mode_info.hint }}</div>
+    </form>
+
+    {% if result %}
+    <div class="result">
+        <h2>{{ result.title }}</h2>
+        <div class="price">{{ result.primary }}</div>
+        {% for line in result.lines %}
+        <p>{{ line }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="error">
+        <strong>Lỗi:</strong> {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="note">
+        {{ mode_info.note }}
+    </div>
+</div>
+</body>
+</html>
