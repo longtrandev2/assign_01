@@ -7,39 +7,42 @@ import pandas as pd
 
 app = Flask(__name__)
 
+HOUSE_NUMERIC_COLS = ["Area", "Frontage", "Access Road", "Floors", "Bedrooms", "Bathrooms"]
+HOUSE_CATEGORICAL_COLS = ["House direction", "Balcony direction", "Legal status", "Furniture state"]
+HOUSE_CATEGORY_OPTIONS = {
+    "House direction": ["Bắc", "Nam", "Đông", "Tây", "Đông - Bắc", "Đông - Nam", "Tây - Bắc", "Tây - Nam"],
+    "Balcony direction": ["Bắc", "Nam", "Đông", "Tây", "Đông - Bắc", "Đông - Nam", "Tây - Bắc", "Tây - Nam"],
+    "Legal status": ["Have certificate", "Sale contract"],
+    "Furniture state": ["Basic", "Full"],
+}
+
+
+def env_flag(name, default):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+# On Render free tier (512MB), disable house model by default to avoid worker restarts.
+HOUSE_MODE_ENABLED = env_flag("ENABLE_HOUSE_MODE", default=(os.environ.get("RENDER") is None))
+HOUSE_MODE_DISABLED_MSG = (
+    "Mode Giá Nhà đang tắt trên bản cloud free để tránh vượt RAM (model quá lớn). "
+    "Bạn có thể dùng mode Tiểu Đường hoặc bật ENABLE_HOUSE_MODE=true khi nâng gói RAM."
+)
+
 
 def load_house_resources():
     artifact = joblib.load("vietnam_house_price_model.joblib")
     model = artifact["model"]
     feature_cols = artifact["feature_cols"]
-    numeric_cols = artifact["numeric_cols"]
-    categorical_cols = artifact["categorical_cols"]
-
-    options = {col: [] for col in categorical_cols}
-    try:
-        preprocessor = model.named_steps["preprocessor"]
-        for name, transformer, _ in preprocessor.transformers_:
-            if name != "cat":
-                continue
-            onehot = transformer.named_steps.get("onehot")
-            if onehot is None or not hasattr(onehot, "categories_"):
-                continue
-            for col, values in zip(categorical_cols, onehot.categories_):
-                options[col] = [str(v) for v in values]
-    except Exception:
-        options = {
-            "House direction": ["Bắc", "Nam", "Đông", "Tây", "Đông - Bắc", "Đông - Nam", "Tây - Bắc", "Tây - Nam"],
-            "Balcony direction": ["Bắc", "Nam", "Đông", "Tây", "Đông - Bắc", "Đông - Nam", "Tây - Bắc", "Tây - Nam"],
-            "Legal status": ["Have certificate", "Sale contract"],
-            "Furniture state": ["Basic", "Full"],
-        }
 
     return {
         "model": model,
         "feature_cols": feature_cols,
-        "numeric_cols": numeric_cols,
-        "categorical_cols": categorical_cols,
-        "options": options,
+        "numeric_cols": HOUSE_NUMERIC_COLS,
+        "categorical_cols": HOUSE_CATEGORICAL_COLS,
+        "options": HOUSE_CATEGORY_OPTIONS,
     }
 
 
@@ -91,9 +94,8 @@ def get_mode(raw_mode):
 
 
 def build_house_fields():
-    house = get_house_resources()
     fields = []
-    for col in house["numeric_cols"]:
+    for col in HOUSE_NUMERIC_COLS:
         fields.append(
             {
                 "name": to_key(col),
@@ -105,13 +107,13 @@ def build_house_fields():
             }
         )
 
-    for col in house["categorical_cols"]:
+    for col in HOUSE_CATEGORICAL_COLS:
         fields.append(
             {
                 "name": to_key(col),
                 "label": col,
                 "type": "select",
-                "options": house["options"].get(col, []),
+                "options": HOUSE_CATEGORY_OPTIONS.get(col, []),
             }
         )
 
@@ -195,15 +197,23 @@ def predict_diabetes(form_values):
 @app.route("/", methods=["GET", "POST"])
 def home():
     mode = get_mode(request.values.get("mode", "house"))
-    mode_info = MODE_META[mode]
+    mode_info = dict(MODE_META[mode])
     fields = build_house_fields() if mode == "house" else build_diabetes_fields()
     form_values = default_form_values(fields)
     result = None
     error = None
+    warning = None
+
+    house_mode_available = not (mode == "house" and not HOUSE_MODE_ENABLED)
+    if mode == "house" and not HOUSE_MODE_ENABLED:
+        warning = HOUSE_MODE_DISABLED_MSG
+        mode_info["hint"] = HOUSE_MODE_DISABLED_MSG
 
     if request.method == "POST":
         form_values = {field["name"]: request.form.get(field["name"], "").strip() for field in fields}
         try:
+            if mode == "house" and not HOUSE_MODE_ENABLED:
+                raise ValueError(HOUSE_MODE_DISABLED_MSG)
             if mode == "house":
                 pred = predict_house(form_values)
             else:
@@ -223,6 +233,8 @@ def home():
         mode_info=mode_info,
         fields=fields,
         form_values=form_values,
+        house_mode_available=house_mode_available,
+        warning=warning,
         result=result,
         error=error,
     )

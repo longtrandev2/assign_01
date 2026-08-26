@@ -213,6 +213,22 @@
             border: 1px solid var(--danger-line);
         }
 
+        .warning {
+            margin-top: 18px;
+            padding: 12px;
+            border-radius: 10px;
+            background: #fff7ed;
+            color: #9a3412;
+            border: 1px solid #fdba74;
+        }
+
+        button:disabled {
+            opacity: .58;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .note {
             margin-top: 22px;
             text-align: center;
@@ -289,11 +305,12 @@
                     min="{{ field.min|default('0') }}"
                     step="{{ field.step|default('0.1') }}"
                     required
+                    {% if mode == 'house' and not house_mode_available %}disabled{% endif %}
                     value="{{ form_values.get(field.name, '') }}"
                     placeholder="{{ field.placeholder|default('Nhập giá trị') }}"
                 >
                 {% else %}
-                <select name="{{ field.name }}" required>
+                <select name="{{ field.name }}" required {% if mode == 'house' and not house_mode_available %}disabled{% endif %}>
                     <option value="">-- Chọn --</option>
                     {% for option in field.options %}
                     <option value="{{ option }}" {% if form_values.get(field.name) == option %}selected{% endif %}>
@@ -306,9 +323,15 @@
             {% endfor %}
         </div>
 
-        <button type="submit">{{ mode_info.button }}</button>
+        <button type="submit" {% if mode == 'house' and not house_mode_available %}disabled{% endif %}>{{ mode_info.button }}</button>
         <div class="hint">{{ mode_info.hint }}</div>
     </form>
+
+    {% if warning %}
+    <div class="warning">
+        <strong>Thông báo:</strong> {{ warning }}
+    </div>
+    {% endif %}
 
     {% if result %}
     <div class="result">
