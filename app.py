@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 
 from flask import Flask, render_template, request
 import joblib
@@ -42,8 +43,14 @@ def load_house_resources():
     }
 
 
-HOUSE = load_house_resources()
-DIABETES_MODEL = joblib.load("diabetes_prediction_final_model.joblib")
+@lru_cache(maxsize=1)
+def get_house_resources():
+    return load_house_resources()
+
+
+@lru_cache(maxsize=1)
+def get_diabetes_model():
+    return joblib.load("diabetes_prediction_final_model.joblib")
 
 
 MODE_META = {
@@ -84,8 +91,9 @@ def get_mode(raw_mode):
 
 
 def build_house_fields():
+    house = get_house_resources()
     fields = []
-    for col in HOUSE["numeric_cols"]:
+    for col in house["numeric_cols"]:
         fields.append(
             {
                 "name": to_key(col),
@@ -97,13 +105,13 @@ def build_house_fields():
             }
         )
 
-    for col in HOUSE["categorical_cols"]:
+    for col in house["categorical_cols"]:
         fields.append(
             {
                 "name": to_key(col),
                 "label": col,
                 "type": "select",
-                "options": HOUSE["options"].get(col, []),
+                "options": house["options"].get(col, []),
             }
         )
 
@@ -128,23 +136,24 @@ def default_form_values(fields):
 
 
 def predict_house(form_values):
+    house = get_house_resources()
     sample = {}
-    for col in HOUSE["numeric_cols"]:
+    for col in house["numeric_cols"]:
         key = to_key(col)
         raw = form_values.get(key, "").strip()
         if raw == "":
             raise ValueError(f"Vui lòng nhập trường số: {col}")
         sample[col] = float(raw)
 
-    for col in HOUSE["categorical_cols"]:
+    for col in house["categorical_cols"]:
         key = to_key(col)
         raw = form_values.get(key, "").strip()
         if raw == "":
             raise ValueError(f"Vui lòng chọn trường phân loại: {col}")
         sample[col] = raw
 
-    data = pd.DataFrame([sample], columns=HOUSE["feature_cols"])
-    raw_pred = float(HOUSE["model"].predict(data)[0])
+    data = pd.DataFrame([sample], columns=house["feature_cols"])
+    raw_pred = float(house["model"].predict(data)[0])
 
     return {
         "primary": format_vnd_from_billion(raw_pred),
@@ -156,6 +165,7 @@ def predict_house(form_values):
 
 
 def predict_diabetes(form_values):
+    diabetes_model = get_diabetes_model()
     payload = pd.DataFrame(
         [
             {
@@ -171,12 +181,12 @@ def predict_diabetes(form_values):
         ]
     )
 
-    pred = int(DIABETES_MODEL.predict(payload)[0])
+    pred = int(diabetes_model.predict(payload)[0])
     primary = "Có nguy cơ mắc tiểu đường" if pred == 1 else "Không có nguy cơ mắc tiểu đường theo mô hình"
 
     lines = []
-    if hasattr(DIABETES_MODEL, "predict_proba"):
-        prob = float(DIABETES_MODEL.predict_proba(payload)[0][1] * 100)
+    if hasattr(diabetes_model, "predict_proba"):
+        prob = float(diabetes_model.predict_proba(payload)[0][1] * 100)
         lines.append(f"Xác suất dự đoán: {prob:.2f}%")
 
     return {"primary": primary, "lines": lines}
